@@ -35,4 +35,7 @@ class RWKV_RM(nn.Module):
             reward = self.reward_head(state)
             results.append(reward)
         
-      
+        return torch.cat(results)
+
+    def load_head_state(self, state_dict):
+        self.reward_head.load_state_dict(state_dict)
