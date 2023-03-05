@@ -30,4 +30,39 @@ def train(rm, dataset, loss, optimizer, batch_size=64, epoch = 10):
         for i, batch in enumerate(dataloader):
             batch_context, batch_label = collate_fn(batch, tokenizer)
             batch_label = batch_label.to(device)
-            reward = rm(batch_context
+            reward = rm(batch_context)
+            loss_value = loss(reward, batch_label)
+            loss_value.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            print(f"Batch {i}: loss {loss_value.item()}")
+
+def eval(rm, dataset, loss, batch_size = 64):
+    """
+    Evaluate the model on the dataset.
+    """
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    total_loss = 0
+    for i, batch in enumerate(dataloader):
+        batch_context, batch_label = collate_fn(batch, tokenizer)
+        batch_label = batch_label.to(device)
+        reward = rm(batch_context)
+        loss_value = loss(reward, batch_label)
+        total_loss += loss_value.item()
+    return total_loss / len(dataloader)
+
+# mse loss
+loss = torch.nn.MSELoss()
+
+# These two lines are proof of concept to overfit a very small dataset
+optimizer = torch.optim.Adam(rwkv_rm.parameters(), lr=1e-3)
+train(rwkv_rm, dataset["train"].select(range(100)), loss, optimizer, batch_size=16, epoch = 10)
+
+# save the model
+torch.save(rwkv_rm.reward_head.state_dict(), "rwkv_rm.reward_head.pth")
+
+# load the model
+rwkv_rm.reward_head.load_state_dict(torch.load("rwkv_rm.reward_head.pth"))
+
+test_loss = eval(rwkv_rm, dataset["test"].select(range(20)), loss)
+print(f"Test loss: {test_loss}")
